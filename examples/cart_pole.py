@@ -2,7 +2,7 @@ import argparse
 
 import mujoco
 
-from hydrax.algs import CEM, MPPI, PredictiveSampling
+from hydrax.algs import CEM, MPPI, PredictiveSampling, DIAL, GAMDALF
 from hydrax.simulation.deterministic import run_interactive
 from hydrax.tasks.cart_pole import CartPole
 
@@ -23,6 +23,12 @@ subparsers = parser.add_subparsers(
 subparsers.add_parser("ps", help="Predictive Sampling")
 subparsers.add_parser("mppi", help="Model Predictive Path Integral Control")
 subparsers.add_parser("cem", help="Cross-Entropy Method")
+subparsers.add_parser(
+    "dial", help="Diffusion-Inspired Annealing for Legged MPC (DIAL)"
+)
+subparsers.add_parser(
+    "gamdalf", help="Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)"
+)
 args = parser.parse_args()
 
 # Set up the controller
@@ -58,6 +64,35 @@ elif args.algorithm == "cem":
         spline_type="cubic",
         plan_horizon=1.0,
         num_knots=4,
+    )
+elif args.algorithm == "dial":
+    print("Running Diffusion-Inspired Annealing for Legged MPC (DIAL)")
+    ctrl = DIAL(
+        task,
+        num_samples=128,
+        noise_level=0.4,
+        beta_opt_iter=1.0,
+        beta_horizon=1.0,
+        temperature=0.001,
+        plan_horizon=1.0,
+        spline_type="zero",
+        num_knots=11,
+        iterations=5,
+    )
+elif args.algorithm == "gamdalf":
+    print("Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)")
+    ctrl = GAMDALF(
+        task,
+        num_samples=128,
+        noise_level=0.4,
+        beta_opt_iter=1.0,
+        beta_horizon=1.0,
+        temperature=10,
+        plan_horizon=0.25,
+        spline_type="zero",
+        num_knots=11,
+        iterations=5,
+        seed=1,
     )
 else:
     parser.error("Other algorithms not implemented for this example!")

@@ -5,7 +5,7 @@ from evosax.algorithms.distribution_based import CMA_ES, RandomSearch, Gradientl
 import mujoco
 import jax
 
-from hydrax.algs import MPPI, CEM, Evosax, PredictiveSampling, DIAL
+from hydrax.algs import MPPI, CEM, Evosax, PredictiveSampling, DIAL, GAMDALF
 from hydrax.risk import WorstCase
 from hydrax.simulation.deterministic import run_interactive
 from hydrax.tasks.particle import Particle
@@ -37,6 +37,9 @@ subparsers.add_parser("gld", help="Gradient-Less Descent")
 subparsers.add_parser("rs", help="Uniform Random Search")
 subparsers.add_parser(
     "dial", help="Diffusion-Inspired Annealing for Legged MPC (DIAL)"
+)
+subparsers.add_parser(
+    "gamdalf", help="Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)"
 )
 args = parser.parse_args()
 
@@ -153,6 +156,20 @@ elif args.algorithm == "rs":
 elif args.algorithm == "dial":
     print("Running Diffusion-Inspired Annealing for Legged MPC (DIAL)")
     ctrl = DIAL(
+        task,
+        num_samples=16,
+        noise_level=0.4,
+        beta_opt_iter=1.0,
+        beta_horizon=1.0,
+        temperature=0.001,
+        plan_horizon=0.25,
+        spline_type="zero",
+        num_knots=11,
+        iterations=5,
+    )
+elif args.algorithm == "gamdalf":
+    print("Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)")
+    ctrl = GAMDALF(
         task,
         num_samples=16,
         noise_level=0.4,
