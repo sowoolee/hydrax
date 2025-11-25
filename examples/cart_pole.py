@@ -1,3 +1,5 @@
+import jax
+jax.config.update("jax_platform_name", "cpu")
 import argparse
 
 import mujoco
@@ -65,14 +67,14 @@ elif args.algorithm == "dial":
     print("Running Diffusion-Inspired Annealing for Legged MPC (DIAL)")
     ctrl = DIAL(
         task,
-        num_samples=4,
+        num_samples=128,
         noise_level=0.4,
         beta_opt_iter=1.0,
         beta_horizon=1.0,
         temperature=0.01,
-        plan_horizon=1.0,
+        plan_horizon=0.2,
         spline_type="zero",
-        num_knots=11,
+        num_knots=2,
         iterations=5,
     )
 elif args.algorithm == "gamdalf":
@@ -84,9 +86,9 @@ elif args.algorithm == "gamdalf":
         beta_opt_iter=1,
         beta_horizon=1,
         temperature=0.001,
-        plan_horizon=1,
+        plan_horizon=0.2,
         spline_type="zero",
-        num_knots=10,
+        num_knots=2,
         iterations=5,
         seed=1,
     )

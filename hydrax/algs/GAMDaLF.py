@@ -195,9 +195,9 @@ class GAMDALF(SamplingBasedController):
         def _optimize_scan_body(params: Any, _: Any):
             # Sample random control sequences from spline knots
             knots, params = self.sample_knots(params)
-            knots = jnp.clip(
-                knots, self.task.u_min, self.task.u_max
-            )  # (num_rollouts, num_knots, nu)
+            # knots = jnp.clip(
+            #     knots, self.task.u_min, self.task.u_max
+            # )  # (num_rollouts, num_knots, nu)
 
             # Roll out the control sequences, applying domain randomizations and
             # combining costs using self.risk_strategy.
