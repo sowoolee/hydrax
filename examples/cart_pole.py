@@ -23,12 +23,8 @@ subparsers = parser.add_subparsers(
 subparsers.add_parser("ps", help="Predictive Sampling")
 subparsers.add_parser("mppi", help="Model Predictive Path Integral Control")
 subparsers.add_parser("cem", help="Cross-Entropy Method")
-subparsers.add_parser(
-    "dial", help="Diffusion-Inspired Annealing for Legged MPC (DIAL)"
-)
-subparsers.add_parser(
-    "gamdalf", help="Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)"
-)
+subparsers.add_parser("dial", help="Diffusion-Inspired Annealing for Legged MPC (DIAL)")
+subparsers.add_parser("gamdalf", help="Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)")
 args = parser.parse_args()
 
 # Set up the controller
@@ -69,11 +65,11 @@ elif args.algorithm == "dial":
     print("Running Diffusion-Inspired Annealing for Legged MPC (DIAL)")
     ctrl = DIAL(
         task,
-        num_samples=128,
+        num_samples=4,
         noise_level=0.4,
         beta_opt_iter=1.0,
         beta_horizon=1.0,
-        temperature=0.001,
+        temperature=0.01,
         plan_horizon=1.0,
         spline_type="zero",
         num_knots=11,
@@ -83,14 +79,14 @@ elif args.algorithm == "gamdalf":
     print("Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)")
     ctrl = GAMDALF(
         task,
-        num_samples=128,
-        noise_level=0.4,
-        beta_opt_iter=1.0,
-        beta_horizon=1.0,
-        temperature=10,
-        plan_horizon=0.25,
+        num_samples=4,
+        noise_level=0.01,
+        beta_opt_iter=1,
+        beta_horizon=1,
+        temperature=0.001,
+        plan_horizon=1,
         spline_type="zero",
-        num_knots=11,
+        num_knots=10,
         iterations=5,
         seed=1,
     )
@@ -107,7 +103,7 @@ run_interactive(
     mj_model,
     mj_data,
     frequency=50,
-    fixed_camera_id=0,
+    # fixed_camera_id=0,
     show_traces=False,
     max_traces=1,
 )

@@ -3,6 +3,7 @@ from typing import Literal, Tuple
 import jax
 # jax.config.update("jax_debug_nans", True)
 # jax.config.update("jax_disable_jit", True)
+# jax.config.update("jax_platform_name", "cpu")
 import jax.numpy as jnp
 from flax.struct import dataclass
 
@@ -11,7 +12,8 @@ from hydrax.risk import RiskStrategy
 from hydrax.task_base import Task
 from mujoco import mjx
 from typing import Any, Literal, Tuple
-import flax.nnx as nnx
+# import flax.nnx as nnx
+from jax import value_and_grad
 @dataclass
 class GAMDALFParams(SamplingParams):
     """Policy parameters for Diffusion-Inspired Annealing for Legged MPC (GAMDALF).
@@ -141,7 +143,36 @@ class GAMDALF(SamplingBasedController):
             rng=rng,
         )
 
-    def optimize(self, state: mjx.Data, params: Any) -> Tuple[Any, Trajectory]:
+    def _objective_for_grad(
+            self,
+            knots: jax.Array,
+            state: mjx.Data,
+            tk: jax.Array,
+            rng: jax.Array,
+    ):
+        """knots에 대해 grad를 구할 scalar loss 함수.
+
+        - rollout → costs 계산
+        - softmax(-cost/λ)로 weight 계산
+        - weight는 stop_gradient
+        - loss = - 1/λ * Σ w_i * J_i
+        """
+        rollouts = self.rollout_with_randomizations(state, tk, knots, rng)
+        # (num_samples, H+1) → time sum
+        costs = jnp.sum(rollouts.costs, axis=1)  # (num_samples,)
+        weights = jax.nn.softmax(-costs / self.temperature, axis=0)  # (num_samples,)
+
+        # weight에는 grad 안 흐르게
+        weights = jax.lax.stop_gradient(weights)
+
+        # scalar loss = Σ w_i * J_i
+        loss = jnp.sum(-weights * costs / self.temperature)
+
+        # 필요하면 weights도 aux로 넘겨서 debug
+        return loss, (rollouts, costs, weights)
+
+
+    def optimize(self, state: mjx.Data, params: GAMDALFParams) -> Tuple[GAMDALFParams, Trajectory]:
         """Perform an optimization step to update the policy parameters.
 
         Args:
@@ -167,37 +198,56 @@ class GAMDALF(SamplingBasedController):
             knots = jnp.clip(
                 knots, self.task.u_min, self.task.u_max
             )  # (num_rollouts, num_knots, nu)
-            # jax.debug.print("knots = {}", knots)
+
             # Roll out the control sequences, applying domain randomizations and
             # combining costs using self.risk_strategy.
-            rng, dr_rng = jax.random.split(params.rng)
-            # rollouts = self.rollout_with_randomizations(
-            #     state, new_tk, knots, dr_rng
-            # )
-            def rollout_with_randomizations_for_grad(
-                    knots: jax.Array,
-                    state: mjx.Data,
-                    tk: jax.Array,
-                    rng: jax.Array,
-            ):
-                rollouts = self.rollout_with_randomizations(
-                    state, tk, knots, rng
-                )
-                costs = jnp.sum(rollouts.costs, axis=1)
-                # jax.debug.print("real costs = {}", -costs / self.temperature)
-                weights = jnp.exp(-costs / self.temperature)
-                # weights = jax.nn.softmax(-costs / self.temperature)
-                # jax.debug.print("real weights = {}", weights)
-                sum_weights = jnp.sum(weights[:, None, None], axis=0).reshape()
-                # jax.debug.print("real sum_weights = {}", sum_weights)
-                return sum_weights, rollouts
-            (costs, rollouts), grads = nnx.value_and_grad(rollout_with_randomizations_for_grad, has_aux=True)(knots, state, new_tk, dr_rng)
+            rng, dr_rng = jax.random.split(params.rng) ## 여기까진 동일
+
+            # gradient 계산: loss(knots) wrt knots
+            (loss, (rollouts, costs, weights)), grads = jax.value_and_grad(
+                lambda k: self._objective_for_grad(k, state, new_tk, dr_rng),
+                has_aux=True,
+            )(knots)
+
+            max_norm = 1e6
+            # grads = jnp.nan_to_num(grads, nan=0.0, posinf=max_norm, neginf=-max_norm)
+            # jax.debug.print("GAMDALF grads before clipping: {}", grads.flatten())
             sum_grads = jnp.sum(grads, axis=0)
-            jax.debug.print("params.mean = {}", params.mean)
-            jax.debug.print("costs = {}", costs)
-            jax.debug.print("sum_grads = {}", sum_grads)
+            # sum_grads = jnp.mean(grads, axis=0)
+            # jax.debug.print("GAMDALF grads sum (score of p1): {}", sum_grads.flatten())
+            # jax.debug.print("GAMDALF weights: {}", weights.flatten())
+            # jax.debug.print("GAMDALF costs: {}", costs.flatten())
+
+
+            noise_level = self.noise_level * jnp.exp(
+                -(params.opt_iteration) / (self.beta_opt_iter * self.iterations)
+                - (self.num_knots - 1 - jnp.arange(self.num_knots))
+                / (self.beta_horizon * self.num_knots)
+            )
+            # step = noise_level[:, None] * sum_grads  # (num_knots, nu)
+            lr = 0.001
+            step = lr * sum_grads  # (num_knots, nu)
+
+            jax.debug.print("iter = {} ,step = {}", params.opt_iteration ,step.flatten())
+            # jax.debug.print("noise_levle = {}", noise_level.flatten())
+
+            new_mean = jnp.clip(params.mean + step, self.task.u_min, self.task.u_max)
+            params = params.replace(mean= new_mean)
+            # jax.debug.print("GAMDALF new mean = {}", new_mean.flatten())
+            # lam = 1e-3
+            # d = u_del.shape[0]
+            #
+            # # Gram matrix: g g^T
+            # A = jnp.outer(u_del, u_del) + lam * jnp.eye(d)
+            #
+            # # (A)^{-1} g  를 구하고 싶다면:
+            # u_del = jnp.linalg.solve(A, u_del)  # shape: (d,)
+            #
+            # params = params.replace(mean=params.mean+u_del)
+            # new_mean = jnp.clip(params.mean, self.task.u_min, self.task.u_max)
+            # params = params.replace(mean=new_mean)
+
             params = params.replace(rng=rng)
-            params = params.replace(mean=params.mean+sum_grads/costs)
 
             # Update the policy parameters based on the combined costs
             # params = self.update_params(params, rollouts)
