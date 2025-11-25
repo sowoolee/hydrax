@@ -157,7 +157,7 @@ elif args.algorithm == "dial":
     print("Running Diffusion-Inspired Annealing for Legged MPC (DIAL)")
     ctrl = DIAL(
         task,
-        num_samples=16,
+        num_samples=256,
         noise_level=0.4,
         beta_opt_iter=1.0,
         beta_horizon=1.0,
@@ -171,7 +171,7 @@ elif args.algorithm == "gamdalf":
     print("Gradient-Aided Model-based Diffusion accelerated by Newton–Langevin Flow (GAMDaLF)")
     ctrl = GAMDALF(
         task,
-        num_samples=16,
+        num_samples=1,
         noise_level=0.4,
         beta_opt_iter=1.0,
         beta_horizon=1.0,

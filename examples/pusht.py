@@ -1,6 +1,6 @@
 import mujoco
 
-from hydrax.algs import PredictiveSampling
+from hydrax.algs import PredictiveSampling, DIAL, GAMDALF
 from hydrax.simulation.deterministic import run_interactive
 from hydrax.tasks.pusht import PushT
 
@@ -12,15 +12,43 @@ Run an interactive simulation of the push-T task with predictive sampling.
 task = PushT()
 
 # Set up the controller
-ctrl = PredictiveSampling(
-    task,
-    num_samples=128,
-    noise_level=0.4,
-    num_randomizations=4,
-    plan_horizon=0.5,
-    spline_type="zero",
-    num_knots=6,
-)
+# ctrl = PredictiveSampling(
+#     task,
+#     num_samples=128,
+#     noise_level=0.4,
+#     num_randomizations=4,
+#     plan_horizon=0.5,
+#     spline_type="zero",
+#     num_knots=6,
+# )
+
+ctrl = GAMDALF(
+        task,
+        num_samples=128,
+        noise_level=0.4,
+        beta_opt_iter=1,
+        beta_horizon=1,
+        temperature=0.001,
+        plan_horizon=0.5,
+        spline_type="zero",
+        num_knots=6,
+        iterations=5,
+        seed=1,
+    )
+
+# ctrl = DIAL(
+#         task,
+#         num_samples=128,
+#         noise_level=0.4,
+#         beta_opt_iter=1,
+#         beta_horizon=1,
+#         temperature=0.001,
+#         plan_horizon=0.5,
+#         spline_type="zero",
+#         num_knots=6,
+#         iterations=5,
+#         seed=1,
+#     )
 
 # Define the model used for simulation
 mj_model = task.mj_model

@@ -1,6 +1,6 @@
 import mujoco
 
-from hydrax.algs import PredictiveSampling
+from hydrax.algs import PredictiveSampling, GAMDALF, DIAL
 from hydrax.risk import ConditionalValueAtRisk
 from hydrax.simulation.deterministic import run_interactive
 from hydrax.tasks.crane import Crane
@@ -13,16 +13,42 @@ Run an interactive simulation of crane payload tracking
 task = Crane()
 
 # Set up the controller
-ctrl = PredictiveSampling(
+# ctrl = PredictiveSampling(
+#     task,
+#     num_samples=8,
+#     noise_level=0.05,
+#     num_randomizations=32,
+#     risk_strategy=ConditionalValueAtRisk(0.1),
+#     plan_horizon=0.8,
+#     spline_type="zero",
+#     num_knots=3,
+# )
+
+ctrl = GAMDALF(
     task,
     num_samples=8,
-    noise_level=0.05,
-    num_randomizations=32,
-    risk_strategy=ConditionalValueAtRisk(0.1),
+    noise_level=0.1,
+    beta_opt_iter=1.0,
+    beta_horizon=1.0,
+    temperature=0.001,
     plan_horizon=0.8,
     spline_type="zero",
     num_knots=3,
+    iterations=5,
 )
+
+# ctrl = DIAL(
+#         task,
+#         num_samples=8,
+#         noise_level=0.1,
+#         beta_opt_iter=1.0,
+#         beta_horizon=1.0,
+#         temperature=0.001,
+#         plan_horizon=0.8,
+#         spline_type="zero",
+#         num_knots=3,
+#         iterations=5,
+#     )
 
 # Define the model used for simulation
 mj_model = task.mj_model

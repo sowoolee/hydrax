@@ -20,7 +20,17 @@ class CartPole(Task):
     def _distance_to_upright(self, state: mjx.Data) -> jax.Array:
         """Get a measure of distance to the upright position."""
         theta = state.qpos[1] + jnp.pi
+        # state_theta = state.qpos[1]
+        # raw = state_theta % (2 * jnp.pi)
+        #
+        # theta = jnp.where(
+        #     (raw >= -0.5 * jnp.pi) & (raw <= 0.5 * jnp.pi),
+        #     raw - jnp.pi,
+        #     (state_theta - jnp.pi) % (2 * jnp.pi) + jnp.pi - jnp.pi
+        # )
         theta_err = jnp.array([jnp.cos(theta) - 1, jnp.sin(theta)])
+        #theta_err =  jnp.arctan2(jnp.sin(state_theta), jnp.cos(state_theta))- jnp.pi
+
         return jnp.sum(jnp.square(theta_err))
 
     def running_cost(self, state: mjx.Data, control: jax.Array) -> jax.Array:

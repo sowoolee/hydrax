@@ -208,9 +208,10 @@ class GAMDALF(SamplingBasedController):
                 lambda k: self._objective_for_grad(k, state, new_tk, dr_rng),
                 has_aux=True,
             )(knots)
+            # jax.debug.print("loss = {}", loss)
 
             max_norm = 1e6
-            # grads = jnp.nan_to_num(grads, nan=0.0, posinf=max_norm, neginf=-max_norm)
+            grads = jnp.nan_to_num(grads, nan=0.0, posinf=max_norm, neginf=-max_norm)
             # jax.debug.print("GAMDALF grads before clipping: {}", grads.flatten())
             sum_grads = jnp.sum(grads, axis=0)
             # sum_grads = jnp.mean(grads, axis=0)
@@ -225,14 +226,14 @@ class GAMDALF(SamplingBasedController):
                 / (self.beta_horizon * self.num_knots)
             )
             # step = noise_level[:, None] * sum_grads  # (num_knots, nu)
-            lr = 0.001
+            lr = 0.01 #0.01
             step = lr * sum_grads  # (num_knots, nu)
 
-            jax.debug.print("iter = {} ,step = {}", params.opt_iteration ,step.flatten())
+            jax.debug.print("iter = {} ,step = {}", params.opt_iteration, step.flatten())
             # jax.debug.print("noise_levle = {}", noise_level.flatten())
 
             new_mean = jnp.clip(params.mean + step, self.task.u_min, self.task.u_max)
-            params = params.replace(mean= new_mean)
+            params = params.replace(mean=new_mean)
             # jax.debug.print("GAMDALF new mean = {}", new_mean.flatten())
             # lam = 1e-3
             # d = u_del.shape[0]
